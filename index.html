@@ -936,57 +936,58 @@
     const u=new SpeechSynthesisUtterance(currentSentence); u.lang="zh-TW"; speechSynthesis.cancel(); speechSynthesis.speak(u);
   }
   
- function startRecognition() {
+ // 在測驗部分加入這段代碼
+let quizRec = null;
+
+function quizRecord() {
     if (!('webkitSpeechRecognition' in window)) {
         alert("此瀏覽器不支援語音辨識，請使用 Chrome。");
         return;
     }
-    if (!currentSentence) {
-        alert("請先按「換一句」生成句子！");
+    if (!currentQuizSentence) {
+        alert("請先開始測驗！");
         return;
     }
     
     // 每次都建立新的實例，以應對行動裝置的限制
-    rec = new webkitSpeechRecognition();
-    rec.lang = "zh-TW";
-    rec.continuous = false;
-    rec.interimResults = false;
+    quizRec = new webkitSpeechRecognition();
+    quizRec.lang = "zh-TW";
+    quizRec.continuous = false;
+    quizRec.interimResults = false;
     
-    rec.onresult = function(e) {
+    quizRec.onresult = function(e) {
         const heard = e.results[0][0].transcript || "";
-        document.getElementById("result").innerText = heard;
-        const { html, pct } = renderDiffHTML(currentSentence, heard);
-        document.getElementById("diff").innerHTML = html;
-        document.getElementById("accuracy").innerText = pct + "%";
-        document.getElementById("feedback").innerText = feedbackByScore(pct);
-        const name = document.getElementById("studentName").value.trim();
-        const sid = document.getElementById("studentId").value.trim();
-        practiceRecords.push({
-            time: nowString(),
-            name,
-            sid,
-            sentence: currentSentence,
-            recognized: heard,
-            accuracy: pct,
-            feedback: feedbackByScore(pct)
-        });
-        toggleRecButtons(false);
+        document.getElementById("quizHeard").innerText = heard;
+        const { html, pct } = renderDiffHTML(currentQuizSentence, heard);
+        document.getElementById("quizDiff").innerHTML = html;
+        currentQuizItem.recognized = heard;
+        currentQuizItem.accuracy = pct;
+        toggleQuizButtons(false);
     };
 
-    rec.onend = function() {
-        // 確保在語音辨識服務結束時，按鈕狀態會被重設
-        toggleRecButtons(false);
+    quizRec.onend = function() {
+        toggleQuizButtons(false);
     };
 
-    rec.onerror = function(e) {
+    quizRec.onerror = function(e) {
         console.error(e);
-        toggleRecButtons(false);
+        toggleQuizButtons(false);
         alert("錄音發生錯誤，請重試或檢查麥克風權限。");
     };
 
-    try {
-        rec.start();
-        toggleRecButtons(true);
+    quizRec.start();
+    toggleQuizButtons(true);
+}
+
+function quizStop() {
+    if(quizRec){ try{ quizRec.stop(); }catch(e){} }
+    toggleQuizButtons(false);
+}
+
+function toggleQuizButtons(recording) {
+    document.getElementById("btnQuizStart").disabled = recording;
+    document.getElementById("btnQuizStop").disabled = !recording;
+}
     } catch (err) {
         console.error("啟動錄音時發生錯誤:", err);
         alert("無法啟動錄音，請確認已授予麥克風權限，並使用支援的瀏覽器。");
@@ -1130,4 +1131,5 @@
 </body>
 
 </html>
+
 

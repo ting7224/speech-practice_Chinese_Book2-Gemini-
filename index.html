@@ -825,7 +825,13 @@
     "大年初五是迎財神的日子，商店通常會在這一天開門。"
   ]
 };
-
+// 在第 828 行后添加:
+let currentSentence = ""; 
+let rec = null;
+let quizRec = null;  // 新增
+let currentQuizSentence = "";  // 新增
+let currentQuizResult = null;  // 新增
+const practiceRecords = [];
   function nowString(){ const t=new Date(),p=n=>String(n).padStart(2,'0'); return `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`; }
   function normalize(str){ if(!str) return ""; return str.replace(/[\s\p{P}\p{S}]/gu,'').replace(/[Ａ-Ｚａ-ｚ０-９]/g,s=>String.fromCharCode(s.charCodeAt(0)-0xFEE0)); }
 
@@ -994,6 +1000,54 @@ function toggleQuizButtons(recording) {
         toggleRecButtons(false);
     }
 }
+  function quizRecord() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("此瀏覽器不支援語音辨識，請使用 Chrome。");
+        return;
+    }
+    if (!currentQuizSentence) {
+        alert("請先開始測驗！");
+        return;
+    }
+    
+    // 每次都建立新的實例，以應對行動裝置的限制
+    const quizRec = new webkitSpeechRecognition();
+    quizRec.lang = "zh-TW";
+    quizRec.continuous = false;
+    quizRec.interimResults = false;
+    
+    quizRec.onresult = function(e) {
+        const heard = e.results[0][0].transcript || "";
+        document.getElementById("quizHeard").innerText = heard;
+        const { html, pct } = renderDiffHTML(currentQuizSentence, heard);
+        document.getElementById("quizDiff").innerHTML = html;
+        currentQuizResult = { sentence: currentQuizSentence, heard, pct };
+        toggleQuizButtons(false);
+    };
+
+    quizRec.onend = function() {
+        toggleQuizButtons(false);
+    };
+
+    quizRec.onerror = function(e) {
+        console.error(e);
+        toggleQuizButtons(false);
+        alert("錄音發生錯誤，請重試或檢查麥克風權限。");
+    };
+
+    quizRec.start();
+    toggleQuizButtons(true);
+}
+
+function toggleQuizButtons(recording) {
+    document.getElementById("btnQuizStart").disabled = recording;
+    document.getElementById("btnQuizStop").disabled = !recording;
+}
+
+function quizStop() {
+    if(quizRec){ try{ quizRec.stop(); }catch(e){} }
+    toggleQuizButtons(false);
+}
   function stopRecognition(){
     if(rec){ try{ rec.stop(); }catch(e){} }
     toggleRecButtons(false);
@@ -1131,5 +1185,6 @@ function toggleQuizButtons(recording) {
 </body>
 
 </html>
+
 
 

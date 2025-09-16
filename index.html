@@ -829,12 +829,12 @@
   ]
 };
 // 在第 828 行后添加:
-let currentSentence = ""; 
-let rec = null;
-let quizRec = null;  // 新增
-let currentQuizSentence = "";  // 新增
-let currentQuizResult = null;  // 新增
-const practiceRecords = [];
+  let currentSentence=""; 
+  let rec=null;
+  const practiceRecords=[];
+  let quizRec = null;
+  let currentQuizSentence = "";
+  let currentQuizResult = null;  
   function nowString(){ const t=new Date(),p=n=>String(n).padStart(2,'0'); return `${t.getFullYear()}-${p(t.getMonth()+1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`; }
   function normalize(str){ if(!str) return ""; return str.replace(/[\s\p{P}\p{S}]/gu,'').replace(/[Ａ-Ｚａ-ｚ０-９]/g,s=>String.fromCharCode(s.charCodeAt(0)-0xFEE0)); }
 
@@ -1192,6 +1192,7 @@ function quizStop() {
 </body>
 
 </html>
+
 
 
 

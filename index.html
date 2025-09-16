@@ -926,7 +926,11 @@ const practiceRecords = [];
   }
 
   // ---- Practice ----
-  let currentSentence=""; let rec=null;
+  let currentSentence = "";
+  let rec = null;
+  let quizRec = null;
+  let currentQuizSentence = "";
+  let currentQuizResult = null;
   const practiceRecords=[];
   function newSentence(){
     const pool=poolFromChecked(); if(pool.length===0){ alert("請先勾選至少一個課次。"); return; }
@@ -1185,6 +1189,7 @@ function quizStop() {
 </body>
 
 </html>
+
 
 
 

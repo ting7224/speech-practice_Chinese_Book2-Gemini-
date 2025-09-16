@@ -937,56 +937,62 @@
   }
   
  function startRecognition() {
-  if (!('webkitSpeechRecognition' in window)) {
-    alert("此瀏覽器不支援語音辨識，請使用 Chrome。");
-    return;
-  }
-  if (!currentSentence) {
-    alert("請先按「換一句」生成句子！");
-    return;
-  }
-  
-  // 每次都建立新的實例，以應對行動裝置的限制
-  rec = new webkitSpeechRecognition();
-  rec.lang = "zh-TW";
-  rec.continuous = false;
-  rec.interimResults = false;
-  
-  rec.onresult = function(e) {
-    const heard = e.results[0][0].transcript || "";
-    document.getElementById("result").innerText = heard;
-    const { html, pct } = renderDiffHTML(currentSentence, heard);
-    document.getElementById("diff").innerHTML = html;
-    document.getElementById("accuracy").innerText = pct + "%";
-    document.getElementById("feedback").innerText = feedbackByScore(pct);
-    const name = document.getElementById("studentName").value.trim();
-    const sid = document.getElementById("studentId").value.trim();
-    practiceRecords.push({
-      time: nowString(),
-      name,
-      sid,
-      sentence: currentSentence,
-      recognized: heard,
-      accuracy: pct,
-      feedback: feedbackByScore(pct)
-    });
-    toggleRecButtons(false);
-  };
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("此瀏覽器不支援語音辨識，請使用 Chrome。");
+        return;
+    }
+    if (!currentSentence) {
+        alert("請先按「換一句」生成句子！");
+        return;
+    }
+    
+    // 每次都建立新的實例，以應對行動裝置的限制
+    rec = new webkitSpeechRecognition();
+    rec.lang = "zh-TW";
+    rec.continuous = false;
+    rec.interimResults = false;
+    
+    rec.onresult = function(e) {
+        const heard = e.results[0][0].transcript || "";
+        document.getElementById("result").innerText = heard;
+        const { html, pct } = renderDiffHTML(currentSentence, heard);
+        document.getElementById("diff").innerHTML = html;
+        document.getElementById("accuracy").innerText = pct + "%";
+        document.getElementById("feedback").innerText = feedbackByScore(pct);
+        const name = document.getElementById("studentName").value.trim();
+        const sid = document.getElementById("studentId").value.trim();
+        practiceRecords.push({
+            time: nowString(),
+            name,
+            sid,
+            sentence: currentSentence,
+            recognized: heard,
+            accuracy: pct,
+            feedback: feedbackByScore(pct)
+        });
+        toggleRecButtons(false);
+    };
 
-  rec.onend = function() {
-    toggleRecButtons(false);
-  };
+    rec.onend = function() {
+        // 確保在語音辨識服務結束時，按鈕狀態會被重設
+        toggleRecButtons(false);
+    };
 
-  rec.onerror = function(e) {
-    console.error(e);
-    toggleRecButtons(false);
-    alert("錄音發生錯誤，請重試或檢查麥克風權限。");
-  };
+    rec.onerror = function(e) {
+        console.error(e);
+        toggleRecButtons(false);
+        alert("錄音發生錯誤，請重試或檢查麥克風權限。");
+    };
 
-  rec.start();
-  toggleRecButtons(true);
-} 
-
+    try {
+        rec.start();
+        toggleRecButtons(true);
+    } catch (err) {
+        console.error("啟動錄音時發生錯誤:", err);
+        alert("無法啟動錄音，請確認已授予麥克風權限，並使用支援的瀏覽器。");
+        toggleRecButtons(false);
+    }
+}
   function stopRecognition(){
     if(rec){ try{ rec.stop(); }catch(e){} }
     toggleRecButtons(false);
@@ -1124,3 +1130,4 @@
 </body>
 
 </html>
+

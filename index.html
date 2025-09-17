@@ -33,6 +33,8 @@
     .checks { max-height: 240px; overflow:auto; border:1px solid #e5e7eb; padding:8px; border-radius:8px; background:#fff; }
     .check-item { display:flex; align-items:center; gap:8px; padding:4px 0; }
     .muted-small { color:#9ca3af; font-size:12px; }
+    .recording { background-color: #ef4444 !important; color: white; }
+    .mobile-note { background: #fef3c7; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 14px; color: #92400e; }
   </style>
 </head>
 <body>
@@ -135,9 +137,6 @@
   </div>
 
 <script>
-  let quizRec = null;
-  let currentQuizSentence = "";
-  let currentQuizResult = null;
   const lessons = {
   "1": [
     "我們一起走到公園裡散步。",
@@ -957,39 +956,51 @@ function quizRecord() {
         alert("此瀏覽器不支援語音辨識，請使用 Chrome。");
         return;
     }
-    if (!currentQuizSentence) {
-        alert("請先開始測驗！");
+    
+    const txt = quizQueue[quizIndex];
+    if (!txt) {
+        alert("請先開始測驗。");
         return;
     }
     
-    // 每次都建立新的實例，以應對行動裝置的限制
+    // 清理之前的實例
+    if (quizRec) {
+        try { quizRec.abort(); } catch(e) {}
+        quizRec = null;
+    }
+    
+    // 建立新實例
     quizRec = new webkitSpeechRecognition();
     quizRec.lang = "zh-TW";
     quizRec.continuous = false;
     quizRec.interimResults = false;
     
     quizRec.onresult = function(e) {
-        const heard = e.results[0][0].transcript || "";
-        document.getElementById("quizHeard").innerText = heard;
-        const { html, pct } = renderDiffHTML(currentQuizSentence, heard);
+        quizHeard = e.results[0][0].transcript || "";
+        document.getElementById("quizHeard").innerText = quizHeard || "（未取得辨識）";
+        const { html } = renderDiffHTML(txt, quizHeard);
         document.getElementById("quizDiff").innerHTML = html;
-        currentQuizItem.recognized = heard;
-        currentQuizItem.accuracy = pct;
-        toggleQuizButtons(false);
+        toggleQuizRecButtons(false);
     };
 
     quizRec.onend = function() {
-        toggleQuizButtons(false);
+        toggleQuizRecButtons(false);
     };
 
     quizRec.onerror = function(e) {
-        console.error(e);
-        toggleQuizButtons(false);
+        console.error("測驗語音辨識錯誤:", e);
+        toggleQuizRecButtons(false);
         alert("錄音發生錯誤，請重試或檢查麥克風權限。");
     };
 
-    quizRec.start();
-    toggleQuizButtons(true);
+    try {
+        quizRec.start();
+        toggleQuizRecButtons(true);
+    } catch (err) {
+        console.error("啟動測驗錄音錯誤:", err);
+        alert("無法啟動錄音，請確認已授予麥克風權限。");
+        toggleQuizRecButtons(false);
+    }
 }
 
 function quizStop() {
@@ -1051,18 +1062,60 @@ function toggleQuizButtons(recording) {
     document.getElementById("btnQuizStop").disabled = !recording;
 }
 
-function quizStop() {
-    if(quizRec){ try{ quizRec.stop(); }catch(e){} }
-    toggleQuizButtons(false);
-}
-  function stopRecognition(){
-    if(rec){ try{ rec.stop(); }catch(e){} }
+function stopRecognition() {
+    if (rec) {
+        try { 
+            rec.stop(); 
+        } catch(e) {
+            try { rec.abort(); } catch(e2) {}
+        }
+        rec = null;
+    }
     toggleRecButtons(false);
-  }
-  function toggleRecButtons(recording){
-    document.getElementById("btnStart").disabled=recording;
-    document.getElementById("btnStop").disabled=!recording;
-  }
+}
+
+function quizStop() {
+    if (quizRec) {
+        try { 
+            quizRec.stop(); 
+        } catch(e) {
+            try { quizRec.abort(); } catch(e2) {}
+        }
+        quizRec = null;
+    }
+    toggleQuizRecButtons(false);
+}
+ function toggleRecButtons(recording) {
+    const startBtn = document.getElementById("btnStart");
+    const stopBtn = document.getElementById("btnStop");
+    
+    startBtn.disabled = recording;
+    stopBtn.disabled = !recording;
+    
+    if (recording) {
+        startBtn.classList.add("recording");
+        startBtn.textContent = "🔴 錄音中...";
+    } else {
+        startBtn.classList.remove("recording");
+        startBtn.textContent = "🎙️ 開始錄音";
+    }
+}
+
+function toggleQuizRecButtons(recording) {
+    const startBtn = document.getElementById("btnQuizStart");
+    const stopBtn = document.getElementById("btnQuizStop");
+    
+    startBtn.disabled = recording;
+    stopBtn.disabled = !recording;
+    
+    if (recording) {
+        startBtn.classList.add("recording");
+        startBtn.textContent = "🔴 錄音中...";
+    } else {
+        startBtn.classList.remove("recording");
+        startBtn.textContent = "🎙️ 2開始錄音";
+    }
+}
   function downloadTxt(){
     if(practiceRecords.length===0){ alert("尚無成績可下載。請先完成一次錄音練習。"); return; }
     const lines=["【中文口語發音練習（Book2_A2）｜成績單】",`匯出時間：${nowString()}`,"","姓名\t學號\t時間\t例句\t辨識結果\t正確率(%)\t建議與回饋"];

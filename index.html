@@ -35,6 +35,14 @@
     .muted-small { color:#9ca3af; font-size:12px; }
     .recording { background-color: #ef4444 !important; color: white; }
     .mobile-note { background: #fef3c7; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 14px; color: #92400e; }
+
+    /* Research consent */
+    .research-modal { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:18px; }
+    .research-modal.hidden { display:none; }
+    .research-card { max-width:680px; width:100%; max-height:90vh; overflow:auto; background:#fff; border-radius:14px; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.28); }
+    .research-card h2 { margin-top:0; }
+    .research-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    .research-settings { margin-top:18px; padding-top:12px; border-top:1px solid #eee; font-size:13px; color:#6b7280; }
   </style>
 </head>
 <body>
@@ -139,7 +147,102 @@
     </div>
   </div>
 
+  <div class="research-settings">
+    研究資料：<span id="researchConsentStatus">尚未選擇</span>
+    <button id="researchSettingsBtn" type="button">研究資料蒐集設定</button>
+  </div>
+
+  <div id="researchConsentModal" class="research-modal">
+    <div class="research-card">
+      <h2>使用者資料蒐集說明</h2>
+      <p>為了解本學習工具的實際使用情形，並作為課程改進與教學研究之參考，本系統可在您同意後，以匿名方式記錄部分使用資料。</p>
+      <p><b>可能記錄：</b>匿名使用者識別碼、使用日期與時間、使用階段、練習／測驗次數、課次、完成時間、示範發音與語音辨識功能使用情形、正確率，以及目標文字與語音辨識結果的字級比對統計（如正確、替代、漏讀、多讀）。</p>
+      <p><b>研究資料庫不蒐集：</b>姓名、學號、電子郵件、錄音檔或完整語音辨識文字。本研究系統不主動蒐集 IP 位址作為研究資料。</p>
+      <p>您可以不同意研究資料蒐集，仍可正常使用本工具；不同意時不會將研究事件傳送至研究資料庫。</p>
+      <div class="research-actions">
+        <button id="consentAcceptBtn" type="button">我了解並同意開始使用</button>
+        <button id="consentDeclineBtn" type="button">不同意資料蒐集，仍繼續使用</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyBegbF1xGZzr3l89rhpUQ3Mt-SBk9A4BWM",
+      authDomain: "speaking-practice2.firebaseapp.com",
+      projectId: "speaking-practice2",
+      storageBucket: "speaking-practice2.firebasestorage.app",
+      messagingSenderId: "296798925937",
+      appId: "1:296798925937:web:f5fe31f43a731d040297d0",
+      measurementId: "G-ZEVQ6ZEP0Q"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    window.saveResearchEventToFirebase = async (event) => {
+      if (!auth.currentUser) await signInAnonymously(auth);
+      const payload = { ...event, anonymous_id: auth.currentUser.uid, client_timestamp:event.timestamp, timestamp:serverTimestamp() };
+      await addDoc(collection(db, "events"), payload);
+      return auth.currentUser.uid;
+    };
+    window.dispatchEvent(new Event('firebase-research-ready'));
+  </script>
+
 <script>
+  // ===== Anonymous research tracking (Book2_A2) =====
+  const RESEARCH_APP_ID = 'speaking-practice-book2-a2';
+  let researchConsent = localStorage.getItem('research_consent_book2a2');
+  let anonymousUserId = localStorage.getItem('research_anonymous_id') || null;
+  const researchSessionId = 'S-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()+'-'+Math.random().toString(36).slice(2));
+  let practiceStartTime = null, practiceTtsCount = 0, practiceAttempt = 0;
+  let quizStartTime = null, quizTtsCount = 0;
+
+  function researchStatus(){
+    const el=document.getElementById('researchConsentStatus');
+    if(el) el.textContent=researchConsent==='accepted'?'已同意蒐集':researchConsent==='declined'?'未同意蒐集':'尚未選擇';
+  }
+  async function logResearchEvent(eventName, details={}){
+    if(researchConsent!=='accepted') return;
+    const event={app_id:RESEARCH_APP_ID, session_id:researchSessionId, event:eventName, timestamp:new Date().toISOString(), ...details};
+    try{
+      if(!window.saveResearchEventToFirebase) throw new Error('Firebase 尚未初始化');
+      const uid=await window.saveResearchEventToFirebase(event);
+      anonymousUserId=uid; localStorage.setItem('research_anonymous_id',uid);
+    }catch(err){ console.warn('研究事件送出失敗：',err); }
+  }
+  function initResearchConsent(){
+    const modal=document.getElementById('researchConsentModal');
+    if(researchConsent) modal.classList.add('hidden');
+    researchStatus();
+    document.getElementById('consentAcceptBtn').onclick=()=>{ researchConsent='accepted'; localStorage.setItem('research_consent_book2a2','accepted'); modal.classList.add('hidden'); researchStatus(); logResearchEvent('consent_given'); logResearchEvent('session_start'); };
+    document.getElementById('consentDeclineBtn').onclick=()=>{ researchConsent='declined'; localStorage.setItem('research_consent_book2a2','declined'); modal.classList.add('hidden'); researchStatus(); };
+    document.getElementById('researchSettingsBtn').onclick=()=>modal.classList.remove('hidden');
+    if(researchConsent==='accepted') logResearchEvent('session_start');
+  }
+  window.addEventListener('DOMContentLoaded',initResearchConsent);
+
+  function findLessonForSentence(sentence){
+    for(const [lesson,arr] of Object.entries(lessons)){ if((arr||[]).includes(sentence)) return lesson; }
+    return '';
+  }
+  function buildCharResearchData(targetRaw, heardRaw){
+    const {ops}=diffAlign(targetRaw,heardRaw);
+    const map=new Map(), errors=[];
+    for(const op of ops){
+      if(op.type==='INS'){ errors.push({target_char:'', recognized_char:op.b, result:'insertion'}); continue; }
+      const ch=op.a;
+      if(!map.has(ch)) map.set(ch,{target_char:ch,total:0,correct:0,substitution:0,deletion:0});
+      const x=map.get(ch); x.total++;
+      if(op.type==='EQ') x.correct++;
+      else if(op.type==='SUB'){ x.substitution++; errors.push({target_char:op.a,recognized_char:op.b,result:'substitution'}); }
+      else if(op.type==='DEL'){ x.deletion++; errors.push({target_char:op.a,recognized_char:'',result:'deletion'}); }
+    }
+    return { char_stats:Array.from(map.values()).sort((a,b)=>a.target_char.localeCompare(b.target_char,'zh-Hant')), char_errors:errors, error_count:errors.length, target_length:normalize(targetRaw).length };
+  }
+
   const lessons = {
   "1": [
     "我們一起走到公園裡散步。",
@@ -994,7 +1097,9 @@
       return; 
     }
     const [key, s] = pool[Math.floor(Math.random() * pool.length)];
-    currentSentence = s; 
+    currentSentence = s;
+    practiceStartTime = Date.now(); practiceTtsCount = 0; practiceAttempt = 0;
+    logResearchEvent('practice_new_sentence',{lesson:key});
     document.getElementById("sentence").innerText = `（${key}）${s}`;
     document.getElementById("result").innerText = "尚無結果";
     document.getElementById("diff").innerText = "尚無結果";
@@ -1009,8 +1114,10 @@
     }
     const u = new SpeechSynthesisUtterance(currentSentence); 
     u.lang = "zh-TW"; 
-    speechSynthesis.cancel(); 
+    speechSynthesis.cancel();
     speechSynthesis.speak(u);
+    practiceTtsCount++;
+    logResearchEvent('practice_tts',{lesson:findLessonForSentence(currentSentence),tts_count:practiceTtsCount});
   }
   
   function startRecognition() {
@@ -1042,14 +1149,10 @@
       const name = document.getElementById("studentName").value;
       const sid = document.getElementById("studentId").value;
       practiceRecords.push({ 
-        name: name, 
-        sid: sid, 
-        time: nowString(), 
-        sentence: currentSentence, 
-        recognized: recognizedText, 
-        accuracy: pct, 
-        feedback: feedbackByScore(pct) 
+        name: name, sid: sid, time: nowString(), sentence: currentSentence, recognized: recognizedText, accuracy: pct, feedback: feedbackByScore(pct) 
       });
+      const charData=buildCharResearchData(currentSentence,recognizedText);
+      logResearchEvent('practice_result',{lesson:findLessonForSentence(currentSentence),score:pct,attempt:practiceAttempt,tts_count:practiceTtsCount,completion_time_sec:practiceStartTime?Math.round((Date.now()-practiceStartTime)/1000):null,...charData});
       toggleRecButtons(false);
     };
 
@@ -1060,6 +1163,8 @@
       toggleRecButtons(false);
     };
 
+    practiceAttempt++;
+    logResearchEvent('practice_recording',{lesson:findLessonForSentence(currentSentence),attempt:practiceAttempt});
     try {
       rec.start();
       toggleRecButtons(true);
@@ -1137,6 +1242,8 @@
       while (quizQueue.length < 3 && pool.length > 0) quizQueue.push(pool[Math.floor(Math.random() * pool.length)]);
     }
     quizRecords.length = 0;
+    quizStartTime = Date.now(); quizTtsCount = 0;
+    logResearchEvent('quiz_start',{selected_lessons:getCheckedLessons()});
     quizIndex = -1;
     quizHeard = "";
     document.getElementById("quizSummary").style.display = "none";
@@ -1169,6 +1276,8 @@
     u.lang = "zh-TW";
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
+    quizTtsCount++;
+    logResearchEvent('quiz_tts',{lesson:findLessonForSentence(txt),question:quizIndex+1,tts_count:quizTtsCount});
   }
   
   function quizRecord() {
@@ -1204,6 +1313,7 @@
       alert("錄音發生錯誤，請重試或檢查麥克風權限。");
     };
     
+    logResearchEvent('quiz_recording',{lesson:findLessonForSentence(currentQuizSentence),question:quizIndex+1});
     try {
       quizRec.start();
       toggleQuizRecButtons(true);
@@ -1249,6 +1359,8 @@
     }
     const { html, pct } = renderDiffHTML(txt, quizHeard);
     quizRecords.push({ idx: quizIndex + 1, sentence: txt, recognized: quizHeard, pct, diffHTML: html });
+    const charData=buildCharResearchData(txt,quizHeard);
+    logResearchEvent('quiz_result',{lesson:findLessonForSentence(txt),question:quizIndex+1,score:pct,...charData});
     quizHeard = ""; // 提交後清空，避免重複提交
     nextQuiz();
   }
@@ -1271,6 +1383,7 @@
       tbody.appendChild(tr);
     });
     document.getElementById("quizSummary").style.display = "block";
+    logResearchEvent('quiz_complete',{score:total,question_count:quizRecords.length,tts_count:quizTtsCount,completion_time_sec:quizStartTime?Math.round((Date.now()-quizStartTime)/1000):null,selected_lessons:getCheckedLessons()});
   }
 
   function downloadQuizTXT() {
